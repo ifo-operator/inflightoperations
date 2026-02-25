@@ -7,6 +7,12 @@ resources:
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
+  - path: patches/selectable-fields.json
+    target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: inflightoperations.ifo.kubevirt.io
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
 # +kubebuilder:scaffold:crdkustomizewebhookpatch

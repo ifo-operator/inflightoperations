@@ -1,0 +1,11 @@
+[
+  {
+    "op": "add",
+    "path": "/spec/versions/0/selectableFields",
+    "value": [
+      { "jsonPath": ".spec.operation" },
+      { "jsonPath": ".status.phase" },
+      { "jsonPath": ".spec.subject.namespace" }
+    ]
+  }
+]
