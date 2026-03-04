@@ -1,0 +1,30 @@
+apiVersion: ifo-operator.org/v1alpha1
+kind: OperationRuleSet
+metadata:
+  name: vmim-rules
+spec:
+  target:
+    group: kubevirt.io
+    version: v1
+    kind: VirtualMachineInstanceMigration
+  rules:
+    - operation: Pending
+      expression: |
+        has(object.status) && has(object.status.phase) && object.status.phase == "Pending"
+
+    - operation: Scheduling
+      expression: |
+        has(object.status) && has(object.status.phase) && object.status.phase == "Scheduling"
+
+    - operation: Scheduled
+      expression: |
+        has(object.status) && has(object.status.phase) && object.status.phase == "Scheduled"
+
+    - operation: Running
+      expression: |
+        has(object.status) && has(object.status.phase) && object.status.phase == "Running"
+
+    - operation: PreparingTarget
+      expression: |
+        has(object.status) && has(object.status.phase) && object.status.phase == "PreparingTarget"
+
