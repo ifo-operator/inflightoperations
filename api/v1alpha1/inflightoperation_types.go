@@ -52,7 +52,7 @@ type SubjectReference struct {
 	Name string `json:"name"`
 
 	// Namespace is the namespace of the resource
-	// Empty for cluster-scoped resources (which we don't track)
+	// Empty for cluster-scoped resources
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
