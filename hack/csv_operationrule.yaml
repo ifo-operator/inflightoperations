@@ -1,0 +1,30 @@
+apiVersion: ifo-operator.org/v1alpha1
+kind: OperationRuleSet
+metadata:
+  name: csv-rules
+spec:
+  target:
+    group: operators.coreos.com
+    version: v1alpha1
+    kind: ClusterServiceVersion
+  rules:
+    - operation: Pending
+      expression: |
+        has(object.status) &&
+        has(object.status.conditions) &&
+        object.status.conditions.exists(c, c.phase == "Pending")
+    - operation: Installing
+      expression: |
+        has(object.status) &&
+        has(object.status.conditions) &&
+        object.status.conditions.exists(c, c.phase == "Installing")
+    - operation: Replacing
+      expression: |
+        has(object.status) &&
+        has(object.status.conditions) &&
+        object.status.conditions.exists(c, c.phase == "Replacing")
+    - operation: Deleting
+      expression: |
+        has(object.status) &&
+        has(object.status.conditions) &&
+        object.status.conditions.exists(c, c.phase == "Deleting")
