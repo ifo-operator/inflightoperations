@@ -16,6 +16,7 @@ func NewWatchCache() *WatchCache {
 	}
 }
 
+// WatchCache must be locked before interacting with it.
 type WatchCache struct {
 	mu      sync.RWMutex
 	watches map[schema.GroupVersionKind]*Watch
@@ -29,7 +30,7 @@ func (r *WatchCache) Unlock() {
 	r.mu.Unlock()
 }
 
-func (r *WatchCache) Add(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) (err error) {
+func (r *WatchCache) StartWithSync(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -40,6 +41,12 @@ func (r *WatchCache) Add(gvk schema.GroupVersionKind, informer cache.SharedIndex
 	}
 	r.watches[gvk] = w
 	return
+}
+
+func (r *WatchCache) Start(gvk schema.GroupVersionKind, informer cache.SharedIndexInformer) {
+	w := NewWatch(gvk, informer)
+	w.Start()
+	r.watches[gvk] = w
 }
 
 func (r *WatchCache) Stop(gvk schema.GroupVersionKind) {

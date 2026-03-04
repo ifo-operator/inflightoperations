@@ -83,10 +83,7 @@ func (r *Watcher) Register(gvk schema.GroupVersionKind) (err error) {
 	if err != nil {
 		return
 	}
-	err = r.cache.Add(gvk, informer)
-	if err != nil {
-		return
-	}
+	r.cache.Start(gvk, informer)
 	r.log.V(0).Info("Watch registered.", "gvk", gvk.String())
 	return
 }
