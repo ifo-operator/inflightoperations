@@ -29,6 +29,7 @@ func (r *BaseReconciler) Ended(reQin time.Duration, err error) (reQ time.Duratio
 	if err == nil {
 		return
 	}
+	reQ = Settings.RequeueInterval
 	r.Log.Error(
 		err,
 		"Reconcile failed.")

@@ -25,6 +25,7 @@ import (
 	libcnd "github.com/ifo-operator/inflightoperations/lib/condition"
 	liberr "github.com/ifo-operator/inflightoperations/lib/error"
 	"github.com/ifo-operator/inflightoperations/lib/logging"
+	"github.com/ifo-operator/inflightoperations/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,12 +39,14 @@ import (
 	api "github.com/ifo-operator/inflightoperations/api/v1alpha1"
 )
 
+var Settings = &settings.Settings
+
 const (
-	Name = "operationrule"
+	Name = "operationruleset"
 )
 
-// OperationRuleReconciler reconciles a OperationRuleSet object
-type OperationRuleReconciler struct {
+// OperationRuleSetReconciler reconciles an OperationRuleSet object
+type OperationRuleSetReconciler struct {
 	BaseReconciler
 	client.Client
 	Scheme          *runtime.Scheme
@@ -54,10 +57,10 @@ type OperationRuleReconciler struct {
 	Evaluator       evaluator.Evaluator
 }
 
-// +kubebuilder:rbac:groups=ifo-operator.org,resources=operationrulesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ifo-operator.org,resources=operationrulesets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=ifo-operator.org,resources=operationrulesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ifo-operator.org,resources=operationrulesets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=ifo-operator.org,resources=inflightoperations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ifo-operator.org,resources=inflightoperations,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=ifo-operator.org,resources=inflightoperations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ifo-operator.org,resources=inflightoperations/finalizers,verbs=update
 
@@ -70,8 +73,8 @@ type OperationRuleReconciler struct {
 //
 // For more details, check Reconcile and its RuleSetResult here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.1/pkg/reconcile
-func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
-	r.Log = logging.WithName(names.SimpleNameGenerator.GenerateName(Name+"|"), "operationrule", req)
+func (r *OperationRuleSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+	r.Log = logging.WithName(names.SimpleNameGenerator.GenerateName(Name+"|"), "operationruleset", req)
 	r.Started()
 	defer func() {
 		result.RequeueAfter = r.Ended(result.RequeueAfter, err)
@@ -79,18 +82,19 @@ func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}()
 
 	operationRule := &api.OperationRuleSet{}
-	if err := r.Get(ctx, req.NamespacedName, operationRule); err != nil {
+	err = r.Get(ctx, req.NamespacedName, operationRule)
+	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Info("OperationRuleSet not found, ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
-		r.Log.Error(err, "Failed to get OperationRuleSet")
+		r.Log.Error(err, "Failed to get OperationRuleSet", "ruleset", req.NamespacedName.Name)
 		return ctrl.Result{}, err
 	}
 
 	// Handle deletion
 	if !operationRule.DeletionTimestamp.IsZero() {
-		err := r.Teardown(ctx, operationRule)
+		err = r.Teardown(ctx, operationRule)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -98,26 +102,27 @@ func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Log.Info("Successfully finalized OperationRuleSet", "rule", operationRule.Name)
+		r.Log.Info("Successfully finalized OperationRuleSet", "ruleset", operationRule.Name)
 	}
 
 	if operationRule.DeletionTimestamp.IsZero() {
-		err := r.AddFinalizer(ctx, operationRule)
+		err = r.AddFinalizer(ctx, operationRule)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
 	operationRule.Status.BeginStagingConditions()
-	r.Log.Info("Begin validating OperationRuleSet", "rule", operationRule.Name)
+	r.Log.Info("Begin validating OperationRuleSet", "ruleset", operationRule.Name)
 	err = r.Validate(ctx, operationRule)
 	if err != nil {
 		return
 	}
-	r.Log.Info("Done validating OperationRuleSet", "rule", operationRule.Name)
+	r.Log.Info("Done validating OperationRuleSet", "ruleset", operationRule.Name)
 
-	// Ready condition.
-	if !operationRule.Status.HasBlockerCondition() {
+	if operationRule.Status.HasBlockerCondition() {
+		result.RequeueAfter = Settings.RequeueInterval
+	} else {
 		err = r.Setup(ctx, operationRule)
 		if err != nil {
 			r.Log.Error(err, "Failed to ensure watch", "gvk", operationRule.GVK().String())
@@ -127,6 +132,7 @@ func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				Reason:  api.ReasonWatchSetupFailed,
 				Message: fmt.Sprintf("Failed to setup watch: %v", err),
 			})
+			result.RequeueAfter = Settings.RequeueInterval
 		} else {
 			operationRule.Status.SetCondition(
 				libcnd.Condition{
@@ -138,10 +144,17 @@ func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				})
 		}
 	}
-	return ctrl.Result{}, nil
+	operationRule.Status.EndStagingConditions()
+	err = r.Status().Update(ctx, operationRule)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.Log.Error(err, "Failed to update OperationRuleSet status", "ruleset", operationRule.Name)
+		return
+	}
+	return
 }
 
-func (r *OperationRuleReconciler) Validate(ctx context.Context, rule *api.OperationRuleSet) error {
+func (r *OperationRuleSetReconciler) Validate(ctx context.Context, rule *api.OperationRuleSet) error {
 	err := r.validateTargetGVK(rule)
 	if err != nil {
 		r.Log.Error(err, "Invalid target GVK", "gvk", rule.GVK().String())
@@ -180,7 +193,7 @@ func (r *OperationRuleReconciler) Validate(ctx context.Context, rule *api.Operat
 	return nil
 }
 
-func (r *OperationRuleReconciler) Setup(_ context.Context, rule *api.OperationRuleSet) error {
+func (r *OperationRuleSetReconciler) Setup(_ context.Context, rule *api.OperationRuleSet) error {
 	r.Rules.AddOrUpdateRule(rule)
 	err := r.Watcher.Register(rule.GVK())
 	if err != nil {
@@ -189,14 +202,14 @@ func (r *OperationRuleReconciler) Setup(_ context.Context, rule *api.OperationRu
 	return nil
 }
 
-func (r *OperationRuleReconciler) Teardown(_ context.Context, rule *api.OperationRuleSet) error {
+func (r *OperationRuleSetReconciler) Teardown(_ context.Context, rule *api.OperationRuleSet) error {
 	r.Rules.RemoveRule(rule)
 	r.Watcher.Prune()
 	return nil
 }
 
 // Initialize sets up the controller with the Manager.
-func (r *OperationRuleReconciler) Initialize(mgr ctrl.Manager) error {
+func (r *OperationRuleSetReconciler) Initialize(mgr ctrl.Manager) error {
 	dc, err := discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -226,7 +239,7 @@ func (r *OperationRuleReconciler) Initialize(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *OperationRuleReconciler) AddFinalizer(ctx context.Context, rule *api.OperationRuleSet) (err error) {
+func (r *OperationRuleSetReconciler) AddFinalizer(ctx context.Context, rule *api.OperationRuleSet) (err error) {
 	patch := client.MergeFrom(rule.DeepCopy())
 	if controllerutil.AddFinalizer(rule, api.OperationRuleSetFinalizer) {
 		err = r.Patch(ctx, rule, patch)
@@ -238,7 +251,7 @@ func (r *OperationRuleReconciler) AddFinalizer(ctx context.Context, rule *api.Op
 	return
 }
 
-func (r *OperationRuleReconciler) RemoveFinalizer(ctx context.Context, rule *api.OperationRuleSet) (err error) {
+func (r *OperationRuleSetReconciler) RemoveFinalizer(ctx context.Context, rule *api.OperationRuleSet) (err error) {
 	patch := client.MergeFrom(rule.DeepCopy())
 	if controllerutil.RemoveFinalizer(rule, api.OperationRuleSetFinalizer) {
 		err = r.Patch(ctx, rule, patch)
@@ -251,7 +264,7 @@ func (r *OperationRuleReconciler) RemoveFinalizer(ctx context.Context, rule *api
 }
 
 // validateTargetGVK checks if the specified GVK exists using discovery
-func (r *OperationRuleReconciler) validateTargetGVK(or *api.OperationRuleSet) error {
+func (r *OperationRuleSetReconciler) validateTargetGVK(or *api.OperationRuleSet) error {
 	// Get all API resources for the group/version
 	gvk := or.GVK()
 	resourceList, err := r.DiscoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
@@ -270,7 +283,7 @@ func (r *OperationRuleReconciler) validateTargetGVK(or *api.OperationRuleSet) er
 }
 
 // validateCELExpressions validates all CEL expressions by attempting to compile them
-func (r *OperationRuleReconciler) validateCELExpressions(or *api.OperationRuleSet) (err error) {
+func (r *OperationRuleSetReconciler) validateCELExpressions(or *api.OperationRuleSet) (err error) {
 	for _, rule := range or.Rules() {
 		// Try to compile the expression using the evaluator
 		// We use a dummy object to test compilation

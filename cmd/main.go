@@ -208,7 +208,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.OperationRuleReconciler{
+	if err := (&controller.OperationRuleSetReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		DynamicClient:   dynamicClient,

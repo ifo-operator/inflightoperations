@@ -68,7 +68,7 @@ var _ = Describe("OperationRuleSet Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &OperationRuleReconciler{
+			controllerReconciler := &OperationRuleSetReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
