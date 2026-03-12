@@ -84,6 +84,7 @@ func LookupBool(envvar string, def bool) (val bool, err error) {
 	str, found := os.LookupEnv(envvar)
 	if !found {
 		val = def
+		return
 	}
 	val, err = strconv.ParseBool(str)
 	if err != nil {
