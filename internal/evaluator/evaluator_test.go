@@ -3,7 +3,7 @@ package evaluator
 import (
 	"testing"
 
-	"github.com/ifo-operator/inflightoperations/internal/rules"
+	api "github.com/ifo-operator/inflightoperations/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -15,11 +15,11 @@ func makeObject(data map[string]interface{}) *unstructured.Unstructured {
 
 func TestEvaluate(t *testing.T) {
 	tests := []struct {
-		name       string
-		object     *unstructured.Unstructured
-		expression string
-		want       bool
-		wantErr    bool
+		name    string
+		object  *unstructured.Unstructured
+		rule    *api.Rule
+		want    bool
+		wantErr bool
 	}{
 		{
 			name: "simple string equality - match",
@@ -28,9 +28,9 @@ func TestEvaluate(t *testing.T) {
 					"phase": "Running",
 				},
 			}),
-			expression: "object.status.phase == 'Running'",
-			want:       true,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.status.phase == 'Running'"},
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "simple string equality - no match",
@@ -39,9 +39,9 @@ func TestEvaluate(t *testing.T) {
 					"phase": "Pending",
 				},
 			}),
-			expression: "object.status.phase == 'Running'",
-			want:       false,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.status.phase == 'Running'"},
+			want:    false,
+			wantErr: false,
 		},
 		{
 			name: "nested field access",
@@ -50,9 +50,9 @@ func TestEvaluate(t *testing.T) {
 					"printableStatus": "Migrating",
 				},
 			}),
-			expression: "object.status.printableStatus == 'Migrating'",
-			want:       true,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.status.printableStatus == 'Migrating'"},
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "numeric comparison",
@@ -61,9 +61,9 @@ func TestEvaluate(t *testing.T) {
 					"replicas": 3,
 				},
 			}),
-			expression: "object.spec.replicas > 2",
-			want:       true,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.spec.replicas > 2"},
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "logical AND",
@@ -73,9 +73,9 @@ func TestEvaluate(t *testing.T) {
 					"ready": true,
 				},
 			}),
-			expression: "object.status.phase == 'Running' && object.status.ready == true",
-			want:       true,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.status.phase == 'Running' && object.status.ready == true"},
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "logical OR",
@@ -84,9 +84,9 @@ func TestEvaluate(t *testing.T) {
 					"phase": "Pending",
 				},
 			}),
-			expression: "object.status.phase == 'Running' || object.status.phase == 'Pending'",
-			want:       true,
-			wantErr:    false,
+			rule:    &api.Rule{Expression: "object.status.phase == 'Running' || object.status.phase == 'Pending'"},
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "invalid expression syntax",
@@ -95,9 +95,9 @@ func TestEvaluate(t *testing.T) {
 					"phase": "Running",
 				},
 			}),
-			expression: "object.status.phase ==",
-			want:       false,
-			wantErr:    true,
+			rule:    &api.Rule{Expression: "object.status.phase =="},
+			want:    false,
+			wantErr: true,
 		},
 		{
 			name: "non-boolean expression",
@@ -106,9 +106,9 @@ func TestEvaluate(t *testing.T) {
 					"phase": "Running",
 				},
 			}),
-			expression: "object.status.phase",
-			want:       false,
-			wantErr:    true,
+			rule:    &api.Rule{Expression: "object.status.phase"},
+			want:    false,
+			wantErr: true,
 		},
 	}
 
@@ -119,7 +119,7 @@ func TestEvaluate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := eval.Evaluate(tt.object, tt.expression)
+			got, err := eval.Evaluate(tt.object, tt.rule)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -135,7 +135,7 @@ func TestEvaluateRules(t *testing.T) {
 	tests := []struct {
 		name    string
 		object  *unstructured.Unstructured
-		rules   []rules.Rule
+		rules   []api.Rule
 		want    []string
 		wantErr bool
 	}{
@@ -146,7 +146,7 @@ func TestEvaluateRules(t *testing.T) {
 					"printableStatus": "Migrating",
 				},
 			}),
-			rules: []rules.Rule{
+			rules: []api.Rule{
 				{Operation: "Migrating", Expression: "object.status.printableStatus == 'Migrating'"},
 				{Operation: "Starting", Expression: "object.status.printableStatus == 'Starting'"},
 			},
@@ -161,7 +161,7 @@ func TestEvaluateRules(t *testing.T) {
 					"ready": true,
 				},
 			}),
-			rules: []rules.Rule{
+			rules: []api.Rule{
 				{Operation: "Running", Expression: "object.status.phase == 'Running'"},
 				{Operation: "Ready", Expression: "object.status.ready == true"},
 				{Operation: "Pending", Expression: "object.status.phase == 'Pending'"},
@@ -176,7 +176,7 @@ func TestEvaluateRules(t *testing.T) {
 					"printableStatus": "Running",
 				},
 			}),
-			rules: []rules.Rule{
+			rules: []api.Rule{
 				{Operation: "Migrating", Expression: "object.status.printableStatus == 'Migrating'"},
 				{Operation: "Starting", Expression: "object.status.printableStatus == 'Starting'"},
 			},
@@ -190,7 +190,7 @@ func TestEvaluateRules(t *testing.T) {
 					"phase": "Running",
 				},
 			}),
-			rules:   []rules.Rule{},
+			rules:   []api.Rule{},
 			want:    []string{},
 			wantErr: false,
 		},
@@ -203,7 +203,10 @@ func TestEvaluateRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := eval.EvaluateRuleSet(tt.object, rules.RuleSet{Name: tt.name, Rules: tt.rules})
+			ruleset := api.OperationRuleSet{}
+			ruleset.Name = tt.name
+			ruleset.Spec.Rules = tt.rules
+			got, err := eval.EvaluateRuleSet(tt.object, &ruleset)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EvaluateRules() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -238,10 +241,11 @@ func TestProgramCaching(t *testing.T) {
 	})
 
 	expression := "object.status.phase == 'Running'"
+	rule := api.Rule{Expression: expression}
 
 	// Evaluate the same expression multiple times
 	for i := 0; i < 5; i++ {
-		result, err := eval.Evaluate(obj, expression)
+		result, err := eval.Evaluate(obj, &rule)
 		if err != nil {
 			t.Fatalf("Evaluate() iteration %d failed: %v", i, err)
 		}

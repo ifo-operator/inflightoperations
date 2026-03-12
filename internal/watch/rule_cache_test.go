@@ -92,7 +92,7 @@ func TestRuleCacheUpdate(t *testing.T) {
 	if len(rules) != 1 {
 		t.Errorf("Expected 1 rule after update, got %d", len(rules))
 	}
-	if len(rules[0].Rules) != 1 || rules[0].Rules[0].Operation != "Starting" {
+	if len(rules[0].Spec.Rules) != 1 || rules[0].Spec.Rules[0].Operation != "Starting" {
 		t.Errorf("Rule was not updated correctly")
 	}
 }

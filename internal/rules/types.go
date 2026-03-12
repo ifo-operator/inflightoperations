@@ -6,12 +6,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// RuleSet represents the complete rules file structure
-type RuleSet struct {
-	Name       string
-	GVK        GroupVersionKind `yaml:"gvk" json:"gvk"`
-	Rules      []Rule           `yaml:"rules" json:"rules"`
-	Namespaces []string         `yaml:"namespaces" json:"namespaces"`
+// Rule represents a single CEL evaluation rule
+type Rule struct {
+	Operation  string `yaml:"operation" json:"operation"`   // Name of the operation (e.g., "Migrating")
+	Expression string `yaml:"expression" json:"expression"` // CEL expression to evaluate
 }
 
 // GroupVersionKind identifies a Kubernetes resource type
@@ -21,12 +19,6 @@ type GroupVersionKind struct {
 	Kind    string `yaml:"kind" json:"kind"`
 }
 
-// Rule represents a single CEL evaluation rule
-type Rule struct {
-	Operation  string `yaml:"operation" json:"operation"`   // Name of the operation (e.g., "Migrating")
-	Expression string `yaml:"expression" json:"expression"` // CEL expression to evaluate
-}
-
 // ToSchemaGVK converts to k8s schema.GroupVersionKind
 func (g GroupVersionKind) ToSchemaGVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{
@@ -34,6 +26,14 @@ func (g GroupVersionKind) ToSchemaGVK() schema.GroupVersionKind {
 		Version: g.Version,
 		Kind:    g.Kind,
 	}
+}
+
+// RuleSet represents the complete rules file structure
+type RuleSet struct {
+	Name       string
+	GVK        GroupVersionKind `yaml:"gvk" json:"gvk"`
+	Rules      []Rule           `yaml:"rules" json:"rules"`
+	Namespaces []string         `yaml:"namespaces" json:"namespaces"`
 }
 
 // Validate validates the rules file structure

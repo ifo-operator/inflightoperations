@@ -68,7 +68,7 @@ type OperationRuleReconciler struct {
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
-// For more details, check Reconcile and its Result here:
+// For more details, check Reconcile and its RuleSetResult here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.1/pkg/reconcile
 func (r *OperationRuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = logging.WithName(names.SimpleNameGenerator.GenerateName(Name+"|"), "operationrule", req)
@@ -283,7 +283,7 @@ func (r *OperationRuleReconciler) validateCELExpressions(or *api.OperationRuleSe
 		// The evaluator's internal compile will catch syntax errors
 		_, err = r.Evaluator.Evaluate(
 			&unstructured.Unstructured{Object: dummyObj},
-			rule.Expression,
+			&rule,
 		)
 		if err != nil {
 			return

@@ -8,18 +8,18 @@ import (
 	liberr "github.com/ifo-operator/inflightoperations/lib/error"
 )
 
-type Result struct {
-	RuleSet    string
+type RuleSetResult struct {
+	RuleSet    *api.OperationRuleSet
 	Operations []string
 }
 
 // Evaluator provides CEL expression evaluation for Kubernetes resources
 type Evaluator interface {
 	// Evaluate evaluates a single CEL expression against an unstructured object
-	Evaluate(subject *api.Subject, expression string) (bool, error)
+	Evaluate(subject *api.Subject, rule *api.Rule) (bool, error)
 
-	// EvaluateRuleSet evaluates a RuleSet and returns as Result.
-	EvaluateRuleSet(subject *api.Subject, ruleset rules.RuleSet) (Result, error)
+	// EvaluateRuleSet evaluates a RuleSet and returns as RuleSetResult.
+	EvaluateRuleSet(subject *api.Subject, ruleset *api.OperationRuleSet) (RuleSetResult, error)
 }
 
 // celEvaluator implements the Evaluator interface
@@ -52,8 +52,8 @@ func (r *celEvaluator) ShouldEvaluate(subject *api.Subject, ruleset rules.RuleSe
 }
 
 // Evaluate evaluates a single CEL expression against an unstructured object
-func (r *celEvaluator) Evaluate(subject *api.Subject, expression string) (value bool, err error) {
-	prog, err := r.programCache.GetOrCompile(expression)
+func (r *celEvaluator) Evaluate(subject *api.Subject, rule *api.Rule) (value bool, err error) {
+	prog, err := r.programCache.GetOrCompile(rule.Expression)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -79,13 +79,13 @@ func (r *celEvaluator) Evaluate(subject *api.Subject, expression string) (value 
 }
 
 // EvaluateRules evaluates all rules and returns matching operation names
-func (r *celEvaluator) EvaluateRuleSet(subject *api.Subject, ruleset rules.RuleSet) (result Result, err error) {
-	result = Result{
-		RuleSet: ruleset.Name,
+func (r *celEvaluator) EvaluateRuleSet(subject *api.Subject, ruleset *api.OperationRuleSet) (result RuleSetResult, err error) {
+	result = RuleSetResult{
+		RuleSet: ruleset,
 	}
-	for _, rule := range ruleset.Rules {
+	for _, rule := range ruleset.Rules() {
 		var matched bool
-		matched, err = r.Evaluate(subject, rule.Expression)
+		matched, err = r.Evaluate(subject, &rule)
 		if err != nil {
 			err = liberr.Wrap(err)
 			return

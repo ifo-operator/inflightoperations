@@ -20,7 +20,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/ifo-operator/inflightoperations/api/v1alpha1"
+	api "github.com/ifo-operator/inflightoperations/api/v1alpha1"
 	"github.com/ifo-operator/inflightoperations/internal/rules"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -29,18 +29,18 @@ import (
 type RuleCache struct {
 	mu sync.RWMutex
 	// cache maps GVK string to list of RuleSets targeting that GVK
-	cache map[schema.GroupVersionKind][]rules.RuleSet
+	cache map[schema.GroupVersionKind][]api.OperationRuleSet
 }
 
 // NewRuleCache creates a new RuleCache
 func NewRuleCache() *RuleCache {
 	return &RuleCache{
-		cache: make(map[schema.GroupVersionKind][]rules.RuleSet),
+		cache: make(map[schema.GroupVersionKind][]api.OperationRuleSet),
 	}
 }
 
 // AddOrUpdateRule adds or updates an OperationRuleSet in the cache
-func (r *RuleCache) AddOrUpdateRule(or *v1alpha1.OperationRuleSet) {
+func (r *RuleCache) AddOrUpdateRule(or *api.OperationRuleSet) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.removeRule(or)
@@ -48,26 +48,26 @@ func (r *RuleCache) AddOrUpdateRule(or *v1alpha1.OperationRuleSet) {
 }
 
 // AddRule adds an OperationRuleSet to the cache.
-func (r *RuleCache) AddRule(or *v1alpha1.OperationRuleSet) {
+func (r *RuleCache) AddRule(or *api.OperationRuleSet) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.addRule(or)
 }
 
 // RemoveRule removes an OperationRuleSet from the cache.
-func (r *RuleCache) RemoveRule(or *v1alpha1.OperationRuleSet) {
+func (r *RuleCache) RemoveRule(or *api.OperationRuleSet) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.removeRule(or)
 }
 
 // unsafe helper; must be called with the cache locked.
-func (r *RuleCache) addRule(or *v1alpha1.OperationRuleSet) {
-	r.cache[or.GVK()] = append(r.cache[or.GVK()], r.ruleSet(or))
+func (r *RuleCache) addRule(or *api.OperationRuleSet) {
+	r.cache[or.GVK()] = append(r.cache[or.GVK()], *or)
 }
 
 // unsafe helper; must be called with the cache locked.
-func (r *RuleCache) removeRule(or *v1alpha1.OperationRuleSet) {
+func (r *RuleCache) removeRule(or *api.OperationRuleSet) {
 	key := or.GVK()
 	rulesets := r.cache[key]
 	for i := range rulesets {
@@ -81,14 +81,14 @@ func (r *RuleCache) removeRule(or *v1alpha1.OperationRuleSet) {
 }
 
 // List returns all rulesets targeting the specified GVK
-func (r *RuleCache) List(gvk schema.GroupVersionKind) (rulesets []rules.RuleSet) {
+func (r *RuleCache) List(gvk schema.GroupVersionKind) (rulesets []api.OperationRuleSet) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	rulesets = r.cache[gvk]
 	return
 }
 
-func (r *RuleCache) ruleSet(cr *v1alpha1.OperationRuleSet) (rf rules.RuleSet) {
+func (r *RuleCache) ruleSet(cr *api.OperationRuleSet) (rf rules.RuleSet) {
 	rf = rules.RuleSet{
 		Name:       path.Join(cr.Namespace, cr.Name),
 		Namespaces: cr.Spec.Namespaces,

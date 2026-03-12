@@ -144,54 +144,71 @@ func (r *Watcher) handle(obj any, gvk schema.GroupVersionKind) (err error) {
 		r.log.V(4).Info("No rulesets for GVK", "gvk", gvk.String())
 		return
 	}
-	detected := make(map[string][]string)
+
+	detected := make(map[string]bool)
+	results := []evaluator.RuleSetResult{}
 	for _, ruleset := range rulesets {
-		var result evaluator.Result
-		result, err = r.evaluator.EvaluateRuleSet(subject, ruleset)
+		var result evaluator.RuleSetResult
+		result, err = r.evaluator.EvaluateRuleSet(subject, &ruleset)
 		if err != nil {
 			r.log.Error(err, "Failed to evaluate ruleset", "ruleset", ruleset, "subject", subject.GetName(), "namespace", subject.GetNamespace())
 			continue
 		}
+		results = append(results, result)
 		for _, operation := range result.Operations {
-			detected[operation] = append(detected[operation], result.RuleSet)
+			detected[operation] = true
 		}
 	}
-	// deal with the operations
 	list, err := r.operations.List(ctx, subject)
 	if err != nil {
 		r.log.Error(err, "Failed to list operations", "subject", subject.GetName(), "namespace", subject.GetNamespace())
 		return
 	}
-	for _, op := range list.Items {
-		if !op.PastDebounceThreshold() {
-			_, found := detected[op.Spec.Operation]
+	for _, ifo := range list.Items {
+		if !ifo.PastDebounceThreshold() {
+			_, found := detected[ifo.Spec.Operation]
 			if !found {
-				op.MarkCompleted(subject)
-				err = r.client.Status().Update(ctx, &op)
-				if err != nil {
-					err = liberr.Wrap(err)
-					r.log.Error(err, "Failed to update operation status", "subject", subject.GetName(), "namespace", subject.GetNamespace())
-					continue
-				}
+				r.markCompleted(ctx, subject, &ifo)
+				r.cleanupCompleted(ctx, &ifo)
 			}
 		}
 	}
-	for operation, detectedBy := range detected {
-		op := r.operations.Build(subject, operation)
-		op, err = r.operations.Ensure(ctx, op)
-		if err != nil {
-			r.log.Error(err, "Failed to ensure operation", "subject", subject.GetName(), "namespace", subject.GetNamespace())
-			continue
-		}
-		op.MarkDetection(subject, detectedBy)
-		err = r.client.Status().Update(ctx, op)
-		if err != nil {
-			err = liberr.Wrap(err)
-			r.log.Error(err, "Failed to update operation status", "subject", subject.GetName(), "namespace", subject.GetNamespace())
-			continue
+
+	for _, result := range results {
+		for _, operation := range result.Operations {
+			op := r.operations.Build(subject, operation, result.RuleSet)
+			op, err = r.operations.Ensure(ctx, op)
+			if err != nil {
+				r.log.Error(err, "Failed to ensure operation", "subject", subject.GetName(), "namespace", subject.GetNamespace())
+				continue
+			}
+			op.MarkDetection(subject, []string{result.RuleSet.Name})
+			err = r.client.Status().Update(ctx, op)
+			if err != nil {
+				err = liberr.Wrap(err)
+				r.log.Error(err, "Failed to update operation status", "subject", subject.GetName(), "namespace", subject.GetNamespace())
+				continue
+			}
 		}
 	}
 	return
+}
+
+func (r *Watcher) markCompleted(ctx context.Context, subject *api.Subject, ifo *api.InFlightOperation) {
+	ifo.MarkCompleted(subject)
+	err := r.client.Status().Update(ctx, ifo)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.log.Error(err, "Failed to update operation status", "subject", subject.GetName(), "namespace", subject.GetNamespace(), "ifo", ifo.Name)
+	}
+}
+
+func (r *Watcher) cleanupCompleted(ctx context.Context, ifo *api.InFlightOperation) {
+	err := r.client.Delete(ctx, ifo)
+	if err != nil {
+		err = liberr.Wrap(err)
+		r.log.Error(err, "Unable to cleanup completed IFO", "ifo", ifo.GetName())
+	}
 }
 
 func (r *Watcher) handleDelete(obj any, _ schema.GroupVersionKind) (err error) {
