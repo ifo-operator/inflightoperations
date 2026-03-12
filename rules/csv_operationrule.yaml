@@ -12,20 +12,25 @@ spec:
     - operation: Pending
       expression: |
         has(object.status) &&
-        has(object.status.conditions) &&
-        object.status.conditions.exists(c, c.phase == "Pending")
+        has(object.status.phase) &&
+        object.status.phase == "Pending"
     - operation: Installing
       expression: |
         has(object.status) &&
-        has(object.status.conditions) &&
-        object.status.conditions.exists(c, c.phase == "Installing")
+        has(object.status.phase) &&
+        object.status.phase == "Installing"
     - operation: Replacing
       expression: |
         has(object.status) &&
-        has(object.status.conditions) &&
-        object.status.conditions.exists(c, c.phase == "Replacing")
+        has(object.status.phase) &&
+        object.status.phase == "Replacing"
     - operation: Deleting
       expression: |
         has(object.status) &&
-        has(object.status.conditions) &&
-        object.status.conditions.exists(c, c.phase == "Deleting")
+        has(object.status.phase) &&
+        object.status.phase == "Deleting"
+    - operation: Failing
+      expression: |
+        has(object.status) &&
+        has(object.status.phase) &&
+        object.status.phase == "Failed"
