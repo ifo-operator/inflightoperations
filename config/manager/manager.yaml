@@ -95,6 +95,9 @@ spec:
             memory: 64Mi
         volumeMounts: []
         imagePullPolicy: Always
+        env:
+          - name: OPERATOR_VERSION
+            value: v99.0.0
       volumes: []
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

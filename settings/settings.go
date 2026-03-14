@@ -16,6 +16,7 @@ const (
 	EnvK8SInformerResync   = "K8S_INFORMER_RESYNC"
 	EnvRetainCompletedIFOs = "RETAIN_COMPLETED_IFOS"
 	EnvRequeueInterval     = "REQUEUE_INTERVAL"
+	EnvOperatorVersion     = "OPERATOR_VERSION"
 )
 
 // Defaults
@@ -43,6 +44,7 @@ type ControllerSettings struct {
 	K8SInformerResync   time.Duration
 	RetainCompletedIFOs bool
 	RequeueInterval     time.Duration
+	OperatorVersion     string
 }
 
 func (r *ControllerSettings) Load() (err error) {
@@ -70,6 +72,7 @@ func (r *ControllerSettings) Load() (err error) {
 	if err != nil {
 		return
 	}
+	r.OperatorVersion = os.Getenv(EnvOperatorVersion)
 	return
 }
 

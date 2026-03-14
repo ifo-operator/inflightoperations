@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-    createdAt: "2026-03-13T03:05:34Z"
+    createdAt: "2026-03-14T02:38:58Z"
     operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: inflightoperations.v99.0.0
@@ -111,7 +111,10 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: quay.io/ifo-operator/controller:99.0.0
+                env:
+                - name: OPERATOR_VERSION
+                  value: v99.0.0
+                image: quay.io/ifo-operator/controller:v99.0.0
                 imagePullPolicy: Always
                 livenessProbe:
                   httpGet:

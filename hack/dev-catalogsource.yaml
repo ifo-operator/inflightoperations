@@ -5,6 +5,6 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: IFO Dev Catalog
-  image: quay.io/ifo-operator/controller-index:99.0.0
+  image: quay.io/ifo-operator/controller-index:v99.0.0
   publisher: Sam Lucidi
   sourceType: grpc

@@ -1,8 +1,8 @@
 VERSION ?= 99.0.0
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/ifo-operator/controller:$(VERSION)
-BUNDLE_IMG ?= quay.io/ifo-operator/controller-bundle:$(VERSION)
-INDEX_IMG ?= quay.io/ifo-operator/controller-index:$(VERSION)
+IMG ?= quay.io/ifo-operator/controller:v$(VERSION)
+BUNDLE_IMG ?= quay.io/ifo-operator/controller-bundle:v$(VERSION)
+INDEX_IMG ?= quay.io/ifo-operator/controller-index:v$(VERSION)
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
